@@ -1,388 +1,720 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booster OS 1 - JioSaavn Player</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-color: #030407;
-            --panel-bg: rgba(18, 22, 36, 0.65);
-            --panel-border: rgba(255, 255, 255, 0.08);
-            --primary-glow: #00f2fe;
-            --secondary-glow: #7928ca;
-            --text-main: #ffffff;
-            --text-secondary: #8e95a5;
-            --accent-pink: #ff0055;
-            --green-glow: #1ed760;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BOOSTER v1.0 - Web Music Player</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #060913;
+      --bg-panel: rgba(18, 24, 38, 0.7);
+      --bg-card: #0d1322;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-purple: #7928ca;
+      --text-white: #ffffff;
+      --text-muted: #8e98b0;
+      --neon-glow: rgba(0, 242, 254, 0.35);
+    }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Plus Jakarta Sans', sans-serif;
-        }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      user-select: none;
+    }
 
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            overflow-x: hidden;
-            min-height: 100vh;
-            padding-bottom: 110px;
-        }
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-white);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
 
-        .ambient-glow {
-            position: fixed;
-            top: 20%;
-            left: 50%;
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(0,242,254,0.15) 0%, rgba(121,40,202,0.15) 50%, rgba(0,0,0,0) 70%);
-            transform: translate(-50%, -50%);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 0;
-            filter: blur(60px);
-            transition: all 0.5s ease;
-        }
+    /* Ambient Background Glow */
+    .ambient-glow {
+      position: fixed;
+      top: -100px;
+      left: 30%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0, 242, 254, 0.12) 0%, rgba(121, 40, 202, 0.08) 50%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(80px);
+    }
 
-        .glass-panel {
-            background: var(--panel-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--panel-border);
-            border-radius: 16px;
-        }
+    /* Layout Shell */
+    .app-shell {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 80px);
+      position: relative;
+      z-index: 1;
+    }
 
-        header {
-            position: sticky;
-            top: 10px;
-            z-index: 100;
-            margin: 10px 20px;
-            padding: 16px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-        }
+    /* Sidebar Navigation */
+    .sidebar {
+      width: 240px;
+      background: rgba(10, 14, 26, 0.85);
+      backdrop-filter: blur(20px);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px 16px;
+    }
 
-        h1 {
-            font-size: 1.5rem;
-            background: linear-gradient(135deg, #00f2fe, #4facfe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 700;
-        }
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
 
-        .search-container {
-            display: flex;
-            width: 100%;
-            max-width: 450px;
-        }
+    .brand-logo span.badge {
+      background: var(--accent-cyan);
+      color: #000;
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
 
-        input[type="text"] {
-            width: 80%;
-            padding: 10px 16px;
-            border: 1px solid var(--panel-border);
-            border-radius: 20px 0 0 20px;
-            outline: none;
-            background: rgba(0, 0, 0, 0.4);
-            color: #fff;
-            font-size: 0.95rem;
-        }
+    .nav-menu {
+      margin-top: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
 
-        button.search-btn {
-            width: 20%;
-            border: none;
-            background: linear-gradient(135deg, #00f2fe, #00c6ff);
-            color: #000;
-            font-weight: 700;
-            border-radius: 0 20px 20px 0;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      background: transparent;
+      border: none;
+      text-align: left;
+      width: 100%;
+    }
 
-        button.search-btn:hover {
-            opacity: 0.9;
-        }
+    .nav-item:hover, .nav-item.active {
+      color: var(--text-white);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+    }
 
-        .container {
-            max-width: 1200px;
-            margin: 20px auto;
-            padding: 0 20px;
-            position: relative;
-            z-index: 1;
-        }
+    .nav-item.active {
+      border-left: 3px solid var(--accent-cyan);
+    }
 
-        .status {
-            text-align: center;
-            font-size: 1.1rem;
-            color: var(--text-secondary);
-            margin-top: 40px;
-        }
+    .sidebar-footer {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-color);
+      padding-top: 16px;
+    }
 
-        .song-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 20px;
-        }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      color: #00ff88;
+    }
 
-        .song-card {
-            padding: 14px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
+    /* Main View Area */
+    .main-viewport {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
 
-        .song-card:hover {
-            transform: translateY(-6px);
-            border-color: rgba(0, 242, 254, 0.3);
-            box-shadow: 0 10px 30px -10px rgba(0, 242, 254, 0.3);
-        }
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
 
-        .song-card img {
-            width: 100%;
-            aspect-ratio: 1/1;
-            object-fit: cover;
-            border-radius: 12px;
-            margin-bottom: 12px;
-        }
+    .search-bar {
+      position: relative;
+      width: 380px;
+    }
 
-        .song-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 4px;
-        }
+    .search-bar input {
+      width: 100%;
+      padding: 12px 16px 12px 40px;
+      border-radius: 20px;
+      background: rgba(18, 24, 38, 0.8);
+      border: 1px solid var(--border-color);
+      color: var(--text-white);
+      outline: none;
+      font-size: 0.85rem;
+    }
 
-        .song-artist {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 10px;
-        }
+    .search-bar::before {
+      content: '🔍';
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.85rem;
+      opacity: 0.5;
+    }
 
-        .play-btn {
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--text-main);
-            border: 1px solid var(--panel-border);
-            padding: 8px;
-            border-radius: 12px;
-            width: 100%;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+    .filter-tags {
+      display: flex;
+      gap: 8px;
+    }
 
-        .song-card:hover .play-btn {
-            background: var(--primary-glow);
-            color: #000;
-        }
+    .tag {
+      padding: 8px 16px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
 
-        /* Bottom Player Bar */
-        .player-bar {
-            position: fixed;
-            bottom: 12px;
-            left: 20px;
-            right: 20px;
-            height: 85px;
-            padding: 12px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            z-index: 200;
-            display: none;
-        }
+    .tag.active {
+      background: var(--accent-cyan);
+      color: #000;
+      font-weight: 700;
+    }
 
-        .player-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            width: 30%;
-        }
+    /* Views */
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
 
-        .player-info img {
-            width: 55px;
-            height: 55px;
-            border-radius: 10px;
-            object-fit: cover;
-        }
+    /* Spotlight Banner */
+    .spotlight-banner {
+      background: linear-gradient(135deg, #00c6ff 0%, #0072ff 50%, #7928ca 100%);
+      border-radius: 20px;
+      padding: 32px;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 198, 255, 0.25);
+    }
 
-        .player-title {
-            font-size: 0.95rem;
-            font-weight: 700;
-        }
+    .spotlight-tag {
+      background: rgba(255, 255, 255, 0.9);
+      color: #000;
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 12px;
+      display: inline-block;
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+    }
 
-        .player-artist {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
+    .spotlight-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
 
-        .controls-center {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 40%;
-            gap: 6px;
-        }
+    .spotlight-sub {
+      font-size: 0.85rem;
+      opacity: 0.9;
+      margin-bottom: 20px;
+    }
 
-        audio {
-            width: 100%;
-            height: 36px;
-            filter: invert(1) hue-rotate(180deg);
-        }
+    .btn-action {
+      background: #ffffff;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-        /* Modal Screens */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(3, 4, 7, 0.85);
-            backdrop-filter: blur(15px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
+    /* Track Library Grid */
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 20px 0 16px 0;
+    }
 
-        .modal-overlay.active {
-            display: flex;
-        }
+    .grid-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+    }
 
-        .modal-content {
-            width: 90%;
-            max-width: 450px;
-            padding: 24px;
-            position: relative;
-            text-align: center;
-        }
+    .track-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 12px;
+      border-radius: 14px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
 
-        .close-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 1.2rem;
-            cursor: pointer;
-        }
-    </style>
+    .track-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 8px 20px var(--neon-glow);
+    }
+
+    .track-thumb {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 10px;
+      object-fit: cover;
+      margin-bottom: 10px;
+    }
+
+    .track-name {
+      font-size: 0.85rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-artist {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .btn-small {
+      background: rgba(255,255,255,0.08);
+      border: none;
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+
+    /* Pro DSP Settings */
+    .dsp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .dsp-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 20px;
+      border-radius: 16px;
+    }
+
+    .dsp-card h3 {
+      font-size: 0.95rem;
+      margin-bottom: 16px;
+      color: var(--accent-cyan);
+    }
+
+    .range-control {
+      margin-bottom: 12px;
+    }
+
+    .range-control label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-cyan);
+    }
+
+    /* Player Bar Bottom */
+    .player-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 80px;
+      background: rgba(10, 14, 26, 0.95);
+      backdrop-filter: blur(25px);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 1000;
+    }
+
+    .player-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: 25%;
+    }
+
+    .player-art {
+      width: 50px;
+      height: 50px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      box-shadow: 0 0 15px var(--neon-glow);
+    }
+
+    .player-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 50%;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      color: var(--text-white);
+      font-size: 1.1rem;
+      cursor: pointer;
+      opacity: 0.8;
+    }
+
+    .icon-btn:hover { opacity: 1; }
+
+    .play-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #ffffff;
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+
+    .progress-bar-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 500px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .bar {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .fill {
+      height: 100%;
+      width: 30%;
+      background: var(--accent-cyan);
+      border-radius: 2px;
+      box-shadow: 0 0 8px var(--accent-cyan);
+    }
+
+    .player-right {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      width: 25%;
+    }
+  </style>
 </head>
 <body>
 
-    <div class="ambient-glow" id="ambientGlow"></div>
+  <div class="ambient-glow"></div>
 
-    <header class="glass-panel">
-        <h1>Booster OS 1</h1>
-        <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Search track, artist..." onkeypress="handleKeyPress(event)">
-            <button class="search-btn" onclick="searchSongs()">Search</button>
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div>
+        <div class="brand-logo">
+          BOOSTER <span class="badge">V1.0</span>
         </div>
-    </header>
+        <nav class="nav-menu">
+          <button class="nav-item active" onclick="switchView('home-view', this)">
+            🏠 Home
+          </button>
+          <button class="nav-item" onclick="switchView('queue-view', this)">
+            🎧 Now Playing & Queue
+          </button>
+          <button class="nav-item" onclick="switchView('dsp-view', this)">
+            🎛️ Pro DSP & Vibe
+          </button>
+          <button class="nav-item" onclick="switchView('tv-view', this)">
+            📺 TV Mode
+          </button>
+        </nav>
+      </div>
 
-    <div class="container">
-        <div id="status" class="status">Search any song to begin playback</div>
-        <div id="songGrid" class="song-grid"></div>
-    </div>
+      <div class="sidebar-footer">
+        <div>Designed by Raj Pawar</div>
+        <div class="status-indicator">
+          <span>●</span> Audio Engine: 96kHz/24-bit
+        </div>
+      </div>
+    </aside>
 
-    <!-- Bottom Player -->
-    <div class="player-bar glass-panel" id="playerBar">
-        <div class="player-info">
-            <img id="playerImg" src="" alt="Album Art">
-            <div>
-                <div class="player-title" id="playerTitle">Song Name</div>
-                <div class="player-artist" id="playerArtist">Artist Name</div>
+    <!-- Main Content Area -->
+    <main class="main-viewport">
+      <div class="header-bar">
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="Search song, artist, mood..." onkeypress="handleSearch(event)">
+        </div>
+        <div class="filter-tags">
+          <div class="tag active">Trending</div>
+          <div class="tag">90s</div>
+          <div class="tag">3D Audio</div>
+          <div class="tag">♥ Favorites</div>
+          <div class="tag">All</div>
+        </div>
+      </div>
+
+      <!-- HOME VIEW -->
+      <section id="home-view" class="view-panel active">
+        <div class="spotlight-banner">
+          <span class="spotlight-tag">BOOSTER SPOTLIGHT</span>
+          <h2 class="spotlight-title" id="spotlightTitle">Continue: Maya Machindra</h2>
+          <p class="spotlight-sub" id="spotlightSub">SP Balasubrahmanyam • Tap to resume where you left off</p>
+          <button class="btn-action" onclick="resumePlay()">▶ Resume Listening</button>
+        </div>
+
+        <h3 class="section-title">Track Library</h3>
+        <div class="grid-cards" id="trackGrid">
+          <!-- Live items populated via API -->
+        </div>
+      </section>
+
+      <!-- QUEUE VIEW -->
+      <section id="queue-view" class="view-panel">
+        <h3 class="section-title">Now Playing Queue</h3>
+        <div class="grid-cards" id="queueGrid"></div>
+      </section>
+
+      <!-- PRO DSP VIEW -->
+      <section id="dsp-view" class="view-panel">
+        <h3 class="section-title">Pro DSP Engine & Equalizer</h3>
+        <div class="dsp-grid">
+          <div class="dsp-card">
+            <h3>Extreme Bass & Vibe Mode</h3>
+            <div class="range-control">
+              <label>Sub-Bass Intensity <span>100%</span></label>
+              <input type="range" min="0" max="100" value="80">
             </div>
+            <div class="range-control">
+              <label>Beat Glow Sync <span>On</span></label>
+              <input type="checkbox" checked>
+            </div>
+          </div>
+          <div class="dsp-card">
+            <h3>Quick Tone Filters</h3>
+            <div class="range-control">
+              <label>Bass Boost <span>0 dB</span></label>
+              <input type="range" min="-12" max="12" value="0">
+            </div>
+            <div class="range-control">
+              <label>Treble Clarity <span>0 dB</span></label>
+              <input type="range" min="-12" max="12" value="0">
+            </div>
+          </div>
         </div>
-        <div class="controls-center">
-            <audio id="audioPlayer" controls autoplay></audio>
+      </section>
+
+      <!-- TV MODE VIEW -->
+      <section id="tv-view" class="view-panel">
+        <div style="text-align: center; padding: 60px 0;">
+          <h2 style="font-size: 2rem;">📺 TV Ambient Mode Active</h2>
+          <p style="color: var(--text-muted); margin-top: 10px;">Full screen audio visualizer & live synced lyrics backdrop.</p>
         </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Bottom Fixed Master Player Bar -->
+  <footer class="player-bar">
+    <div class="player-left">
+      <div class="player-art" id="currentArt"></div>
+      <div>
+        <div class="track-name" id="currentTitle">Nusta Paisa</div>
+        <div class="track-artist" id="currentArtist">MC STAN • Booster Engine</div>
+      </div>
     </div>
 
-    <script>
-        const BASE_URL = 'https://jiosaavn-api.raj-pawar091206.workers.dev';
+    <div class="player-center">
+      <div class="controls">
+        <button class="icon-btn">🔀</button>
+        <button class="icon-btn">⏮</button>
+        <button class="icon-btn play-circle" id="masterPlayBtn" onclick="togglePlay()">⏸</button>
+        <button class="icon-btn">⏭</button>
+        <button class="icon-btn">🔁</button>
+      </div>
+      <div class="progress-bar-container">
+        <span id="timeCurrent">0:05</span>
+        <div class="bar">
+          <div class="fill" id="progressFill"></div>
+        </div>
+        <span id="timeTotal">3:42</span>
+      </div>
+    </div>
 
-        function handleKeyPress(event) {
-            if (event.key === 'Enter') searchSongs();
-        }
+    <div class="player-right">
+      <span style="font-size:0.8rem; color:var(--text-muted);">Vol</span>
+      <input type="range" min="0" max="1" step="0.01" value="0.8" style="width: 100px;">
+    </div>
+  </footer>
 
-        async function searchSongs() {
-            const query = document.getElementById('searchInput').value.trim();
-            const statusDiv = document.getElementById('status');
-            const songGrid = document.getElementById('songGrid');
+  <script>
+    const API_URL = 'https://jiosaavn-api.raj-pawar091206.workers.dev';
+    let audio = new Audio();
+    let isPlaying = false;
 
-            if (!query) return alert('Enter a search term!');
+    // View Switching
+    function switchView(viewId, element) {
+      document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById(viewId).classList.add('active');
+      element.classList.add('active');
+    }
 
-            statusDiv.innerText = 'Searching Booster OS engine...';
-            statusDiv.style.display = 'block';
-            songGrid.innerHTML = '';
+    // Default Initial Search
+    window.onload = () => {
+      fetchTracks('Bollywood Latest');
+    };
 
-            try {
-                const response = await fetch(`${BASE_URL}/api/search/songs?query=${encodeURIComponent(query)}`);
-                const data = await response.json();
-                const songs = data?.data?.results;
+    function handleSearch(event) {
+      if (event.key === 'Enter') {
+        const query = document.getElementById('searchInput').value.trim();
+        if (query) fetchTracks(query);
+      }
+    }
 
-                if (!songs || songs.length === 0) {
-                    statusDiv.innerText = 'No songs found. Try another search.';
-                    return;
-                }
+    async function fetchTracks(query) {
+      const grid = document.getElementById('trackGrid');
+      grid.innerHTML = '<div style="color:var(--text-muted)">Loading tracks...</div>';
 
-                statusDiv.style.display = 'none';
+      try {
+        const res = await fetch(`${API_URL}/api/search/songs?query=${encodeURIComponent(query)}`);
+        const result = await res.json();
+        const songs = result?.data?.results || [];
 
-                songs.forEach(song => {
-                    const title = decodeHTMLEntities(song.name);
-                    const artist = decodeHTMLEntities(song.primaryArtists || 'Unknown Artist');
-                    const image = song.image[2]?.url || song.image[1]?.url || song.image[0]?.url;
-                    const audioUrl = song.downloadUrl[song.downloadUrl.length - 1]?.url;
+        grid.innerHTML = '';
+        songs.forEach((song, idx) => {
+          const title = decodeEntities(song.name);
+          const artist = decodeEntities(song.primaryArtists || 'Unknown');
+          const img = song.image[2]?.url || song.image[0]?.url;
+          const streamUrl = song.downloadUrl[song.downloadUrl.length - 1]?.url;
 
-                    const card = document.createElement('div');
-                    card.className = 'song-card glass-panel';
-                    card.innerHTML = `
-                        <div>
-                            <img src="${image}" alt="${title}">
-                            <div class="song-title" title="${title}">${title}</div>
-                            <div class="song-artist" title="${artist}">${artist}</div>
-                        </div>
-                        <button class="play-btn" onclick="playSong('${title.replace(/'/g, "\\'")}', '${artist.replace(/'/g, "\\'")}', '${image}', '${audioUrl}')">Play Track</button>
-                    `;
-                    songGrid.appendChild(card);
-                });
+          const card = document.createElement('div');
+          card.className = 'track-card';
+          card.innerHTML = `
+            <img class="track-thumb" src="${img}" alt="${title}">
+            <div class="track-name">${idx + 1}. ${title}</div>
+            <div class="track-artist">${artist}</div>
+            <div class="track-footer">
+              <button class="btn-small" onclick="playSong('${title.replace(/'/g, "\\'")}', '${artist.replace(/'/g, "\\'")}', '${img}', '${streamUrl}')">Play</button>
+              <button class="btn-small">+ Queue</button>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (err) {
+        grid.innerHTML = '<div style="color:red">Failed to load songs</div>';
+      }
+    }
 
-            } catch (error) {
-                console.error(error);
-                statusDiv.innerText = 'Unable to connect to service.';
-            }
-        }
+    function playSong(title, artist, img, url) {
+      document.getElementById('currentTitle').innerText = title;
+      document.getElementById('currentArtist').innerText = artist;
+      document.getElementById('currentArt').style.background = `url('${img}') center/cover`;
+      
+      audio.src = url;
+      audio.play();
+      isPlaying = true;
+      document.getElementById('masterPlayBtn').innerText = '⏸';
+    }
 
-        function playSong(title, artist, image, audioUrl) {
-            const playerBar = document.getElementById('playerBar');
-            const playerImg = document.getElementById('playerImg');
-            const playerTitle = document.getElementById('playerTitle');
-            const playerArtist = document.getElementById('playerArtist');
-            const audioPlayer = document.getElementById('audioPlayer');
+    function togglePlay() {
+      if (!audio.src) return;
+      if (isPlaying) {
+        audio.pause();
+        document.getElementById('masterPlayBtn').innerText = '▶';
+      } else {
+        audio.play();
+        document.getElementById('masterPlayBtn').innerText = '⏸';
+      }
+      isPlaying = !isPlaying;
+    }
 
-            playerTitle.innerText = title;
-            playerArtist.innerText = artist;
-            playerImg.src = image;
-            audioPlayer.src = audioUrl;
+    function resumePlay() {
+      if (audio.src) audio.play();
+    }
 
-            playerBar.style.display = 'flex';
-            audioPlayer.play();
-        }
+    function decodeEntities(str) {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = str;
+      return txt.value;
+    }
 
-        function decodeHTMLEntities(text) {
-            const textArea = document.createElement('textarea');
-            textArea.innerHTML = text;
-            return textArea.value;
-        }
-    </script>
+    // Audio Progress Sync
+    audio.ontimeupdate = () => {
+      if (!audio.duration) return;
+      const pct = (audio.currentTime / audio.duration) * 100;
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('timeCurrent').innerText = formatTime(audio.currentTime);
+      document.getElementById('timeTotal').innerText = formatTime(audio.duration);
+    };
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+  </script>
 </body>
 </html>
