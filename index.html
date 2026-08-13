@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booster OS 1 - JioSaavn Player</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #030407;
+            --panel-bg: rgba(18, 22, 36, 0.65);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --primary-glow: #00f2fe;
+            --secondary-glow: #7928ca;
+            --text-main: #ffffff;
+            --text-secondary: #8e95a5;
+            --accent-pink: #ff0055;
+            --green-glow: #1ed760;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow-x: hidden;
+            min-height: 100vh;
+            padding-bottom: 110px;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            top: 20%;
+            left: 50%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(0,242,254,0.15) 0%, rgba(121,40,202,0.15) 50%, rgba(0,0,0,0) 70%);
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(60px);
+            transition: all 0.5s ease;
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+        }
+
+        header {
+            position: sticky;
+            top: 10px;
+            z-index: 100;
+            margin: 10px 20px;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, #00f2fe, #4facfe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        .search-container {
+            display: flex;
+            width: 100%;
+            max-width: 450px;
+        }
+
+        input[type="text"] {
+            width: 80%;
+            padding: 10px 16px;
+            border: 1px solid var(--panel-border);
+            border-radius: 20px 0 0 20px;
+            outline: none;
+            background: rgba(0, 0, 0, 0.4);
+            color: #fff;
+            font-size: 0.95rem;
+        }
+
+        button.search-btn {
+            width: 20%;
+            border: none;
+            background: linear-gradient(135deg, #00f2fe, #00c6ff);
+            color: #000;
+            font-weight: 700;
+            border-radius: 0 20px 20px 0;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button.search-btn:hover {
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .status {
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-top: 40px;
+        }
+
+        .song-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 20px;
+        }
+
+        .song-card {
+            padding: 14px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .song-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(0, 242, 254, 0.3);
+            box-shadow: 0 10px 30px -10px rgba(0, 242, 254, 0.3);
+        }
+
+        .song-card img {
+            width: 100%;
+            aspect-ratio: 1/1;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .song-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .song-artist {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 10px;
+        }
+
+        .play-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            border: 1px solid var(--panel-border);
+            padding: 8px;
+            border-radius: 12px;
+            width: 100%;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .song-card:hover .play-btn {
+            background: var(--primary-glow);
+            color: #000;
+        }
+
+        /* Bottom Player Bar */
+        .player-bar {
+            position: fixed;
+            bottom: 12px;
+            left: 20px;
+            right: 20px;
+            height: 85px;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 200;
+            display: none;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 30%;
+        }
+
+        .player-info img {
+            width: 55px;
+            height: 55px;
+            border-radius: 10px;
+            object-fit: cover;
+        }
+
+        .player-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .player-artist {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .controls-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 40%;
+            gap: 6px;
+        }
+
+        audio {
+            width: 100%;
+            height: 36px;
+            filter: invert(1) hue-rotate(180deg);
+        }
+
+        /* Modal Screens */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 4, 7, 0.85);
+            backdrop-filter: blur(15px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 450px;
+            padding: 24px;
+            position: relative;
+            text-align: center;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-glow" id="ambientGlow"></div>
+
+    <header class="glass-panel">
+        <h1>Booster OS 1</h1>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search track, artist..." onkeypress="handleKeyPress(event)">
+            <button class="search-btn" onclick="searchSongs()">Search</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="status" class="status">Search any song to begin playback</div>
+        <div id="songGrid" class="song-grid"></div>
+    </div>
+
+    <!-- Bottom Player -->
+    <div class="player-bar glass-panel" id="playerBar">
+        <div class="player-info">
+            <img id="playerImg" src="" alt="Album Art">
+            <div>
+                <div class="player-title" id="playerTitle">Song Name</div>
+                <div class="player-artist" id="playerArtist">Artist Name</div>
+            </div>
+        </div>
+        <div class="controls-center">
+            <audio id="audioPlayer" controls autoplay></audio>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'https://jiosaavn-api.raj-pawar091206.workers.dev';
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') searchSongs();
+        }
+
+        async function searchSongs() {
+            const query = document.getElementById('searchInput').value.trim();
+            const statusDiv = document.getElementById('status');
+            const songGrid = document.getElementById('songGrid');
+
+            if (!query) return alert('Enter a search term!');
+
+            statusDiv.innerText = 'Searching Booster OS engine...';
+            statusDiv.style.display = 'block';
+            songGrid.innerHTML = '';
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/search/songs?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                const songs = data?.data?.results;
+
+                if (!songs || songs.length === 0) {
+                    statusDiv.innerText = 'No songs found. Try another search.';
+                    return;
+                }
+
+                statusDiv.style.display = 'none';
+
+                songs.forEach(song => {
+                    const title = decodeHTMLEntities(song.name);
+                    const artist = decodeHTMLEntities(song.primaryArtists || 'Unknown Artist');
+                    const image = song.image[2]?.url || song.image[1]?.url || song.image[0]?.url;
+                    const audioUrl = song.downloadUrl[song.downloadUrl.length - 1]?.url;
+
+                    const card = document.createElement('div');
+                    card.className = 'song-card glass-panel';
+                    card.innerHTML = `
+                        <div>
+                            <img src="${image}" alt="${title}">
+                            <div class="song-title" title="${title}">${title}</div>
+                            <div class="song-artist" title="${artist}">${artist}</div>
+                        </div>
+                        <button class="play-btn" onclick="playSong('${title.replace(/'/g, "\\'")}', '${artist.replace(/'/g, "\\'")}', '${image}', '${audioUrl}')">Play Track</button>
+                    `;
+                    songGrid.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error(error);
+                statusDiv.innerText = 'Unable to connect to service.';
+            }
+        }
+
+        function playSong(title, artist, image, audioUrl) {
+            const playerBar = document.getElementById('playerBar');
+            const playerImg = document.getElementById('playerImg');
+            const playerTitle = document.getElementById('playerTitle');
+            const playerArtist = document.getElementById('playerArtist');
+            const audioPlayer = document.getElementById('audioPlayer');
+
+            playerTitle.innerText = title;
+            playerArtist.innerText = artist;
+            playerImg.src = image;
+            audioPlayer.src = audioUrl;
+
+            playerBar.style.display = 'flex';
+            audioPlayer.play();
+        }
+
+        function decodeHTMLEntities(text) {
+            const textArea = document.createElement('textarea');
+            textArea.innerHTML = text;
+            return textArea.value;
+        }
+    </script>
+</body>
+</html>
