@@ -4409,5 +4409,74 @@ input[type="range"]::-webkit-slider-runnable-track{accent-color:var(--ui-accent)
 })();
 </script>
 
+
+<style id="bo-final-theme-fix">
+/* FINAL THEME RULE:
+   Desktop: show Auto + presets.
+   Mobile: show Auto + presets, but Auto is selected by default. */
+@media (max-width:600px){
+  [data-side-theme="auto"]{display:flex!important}
+}
+@media (min-width:601px){
+  [data-side-theme="auto"]{display:flex!important}
+}
+</style>
+<script id="bo-final-theme-fix-js">
+(function(){
+  'use strict';
+  const KEY='bo_auto_song_color';
+
+  function mobile(){return window.matchMedia('(max-width:600px)').matches;}
+
+  function sync(){
+    const isAuto = localStorage.getItem(KEY)==='1';
+    // Mobile defaults to Auto unless the user has explicitly chosen another mode.
+    if(mobile() && localStorage.getItem('bo_theme_user_choice')===null){
+      localStorage.setItem(KEY,'1');
+    }
+    window.__boAutoSongColor = mobile()
+      ? (localStorage.getItem(KEY)!=='0')
+      : (localStorage.getItem(KEY)==='1');
+
+    document.querySelectorAll('[data-side-theme="auto"]').forEach(b=>{
+      b.style.display='flex';
+      b.classList.toggle('active',window.__boAutoSongColor);
+    });
+  }
+
+  function bind(){
+    document.querySelectorAll('[data-side-theme]').forEach(b=>{
+      if(b.dataset.finalThemeFix)return;
+      b.dataset.finalThemeFix='1';
+      b.addEventListener('click',function(){
+        const t=this.dataset.sideTheme;
+        if(t==='auto'){
+          localStorage.setItem(KEY,'1');
+          localStorage.removeItem('bo_theme_user_choice');
+          window.__boAutoSongColor=true;
+          try{
+            const tr=typeof currentTrack==='function'?currentTrack():null;
+            window.__boExtractSongColor?.(tr);
+          }catch(e){}
+        }else{
+          localStorage.setItem(KEY,'0');
+          localStorage.setItem('bo_theme_user_choice',t||'preset');
+          window.__boAutoSongColor=false;
+        }
+        setTimeout(sync,0);
+      });
+    });
+    sync();
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',bind,{once:true});
+  }else bind();
+
+  window.addEventListener('resize',sync,{passive:true});
+  new MutationObserver(bind).observe(document.documentElement,{childList:true,subtree:true});
+})();
+</script>
+
 </body>
 </html>
