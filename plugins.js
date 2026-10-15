@@ -157,6 +157,16 @@
         set: function (k, v) { ls.set("data_" + id + "_" + k, v); }
       },
 
+      /* ---- sources: songs for Search + playback. ON = songs appear, OFF = they disappear (removed automatically) ----
+         src = { name, search(q,{signal,limit}) -> [{id,name,artistName,image,duration}], resolve(track) -> url | {url,alt}, ttl(ms) } */
+      sources: {
+        register: function (src) {
+          if (!src || typeof src.search !== "function") throw new Error("api.sources.register needs { name, search(q), resolve(track) }");
+          var off = B.SourceHub.register(Object.assign({}, src, { id: id, name: src.name || id }));
+          addCleanup(off); return off;
+        }
+      },
+
       /* ---- timers that stop when the plugin is disabled ---- */
       setInterval: function (fn, ms) { var t = setInterval(fn, ms); addCleanup(function () { clearInterval(t); }); return t; },
       setTimeout: function (fn, ms) { var t = setTimeout(fn, ms); addCleanup(function () { clearTimeout(t); }); return t; },
@@ -194,9 +204,10 @@
     if (!def) return;
     if (active[id]) return;
     var cleanups = [];
-    active[id] = { cleanups: cleanups };
+    var apiObj = makeApi(id, cleanups);
+    active[id] = { cleanups: cleanups, api: apiObj };
     try {
-      var r = def.init && def.init(makeApi(id, cleanups));
+      var r = def.init && def.init(apiObj);
       if (r && typeof r.then === "function") {
         r.then(function () { status[id] = "on"; }, function (e) { stop(id); fail(id, e); });
         status[id] = "loading";
@@ -231,6 +242,7 @@
   function enable(id) {
     var entry = findEntry(id); if (!entry) return;
     setEnabled(id, true);
+    if (entry.type === "source") B.SourceHub.changed();
     if (entry.type === "theme") {
       if (stylesheets[id]) return;
       var l = document.createElement("link");
@@ -254,6 +266,7 @@
       status[id] = "off"; return;
     }
     stop(id);
+    if (entry && entry.type === "source") B.SourceHub.changed();
   }
 
   /* ------------------------------------------------------------------ adding plugins from the app */
@@ -345,6 +358,7 @@
         + '<div class="bos-plg-desc">' + esc(p.description || "") + "</div>"
         + (errors[p.id] ? '<div class="bos-plg-errtxt">' + esc(errors[p.id]) + "</div>" : "")
         + "</div>"
+        + (defs[p.id] && defs[p.id].configure && active[p.id] ? '<button class="bos-plg-cfg" data-cfg="' + esc(p.id) + '">Settings</button>' : "")
         + (p.builtin ? "" : '<button class="bos-plg-rm" data-rm="' + esc(p.id) + '">Remove</button>')
         + '<label class="bos-plg-sw"><input type="checkbox" data-pl="' + esc(p.id) + '"' + (on ? " checked" : "") + '><span></span></label>'
         + "</div>";
@@ -364,6 +378,12 @@
 
     $$("input[data-pl]", el).forEach(function (cb) {
       cb.addEventListener("change", function () { cb.checked ? enable(cb.dataset.pl) : disable(cb.dataset.pl); setTimeout(function () { renderManager(el); }, 50); });
+    });
+    $$("[data-cfg]", el).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var d = defs[b.dataset.cfg], a = active[b.dataset.cfg];
+        try { d && d.configure && a && d.configure(a.api); } catch (e) { fail(b.dataset.cfg, e); }
+      });
     });
     $$("[data-rm]", el).forEach(function (b) {
       b.addEventListener("click", function () { if (confirm("Remove plugin '" + b.dataset.rm + "'?")) removePlugin(b.dataset.rm); });
@@ -424,6 +444,7 @@
       + ".bos-plg-add input[type=text],.bos-plg-add #bos-plg-url{background:rgba(255,255,255,.06);border:1px solid var(--glass-2-brd);border-radius:12px;padding:10px 12px;color:var(--text-1);font:inherit;font-size:13px;min-width:0}"
       + "#bos-plg-addbtn,.bos-plg-file,.bos-plg-rm{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:10px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-block}"
       + ".bos-plg-rm{background:rgba(255,80,80,.22);padding:8px 12px;font-size:12px}"
+      + ".bos-plg-cfg{background:rgba(255,255,255,.12);color:var(--text-1);border:0;border-radius:12px;padding:8px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}"
       + ".bos-plg-file input{display:none}"
       + ".bos-plg-addrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.bos-plg-addrow #bos-plg-url{flex:1;min-width:160px}"
       + ".bos-plg-btnlabel{font-size:11px;font-weight:700;margin-left:6px;color:var(--text-1)}"
@@ -435,6 +456,7 @@
   /* ------------------------------------------------------------------ boot */
   function boot() {
     installManager();
+    registry().forEach(function (p) { if (p.type === "source") { var m = ls.get("enabled", {}); if (!(p.id in m)) setEnabled(p.id, !!p.enabled); } });
     registry().forEach(function (p) { if (isEnabled(p)) enable(p.id); else status[p.id] = "off"; });
     console.info("[BOS] plugin system ready —", registry().length, "plugin(s) known");
   }

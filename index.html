@@ -951,6 +951,90 @@ const Api={
   getArtistSongs(id,page,signal){return apiFetch(MUSIC_API+"/artists/"+encodeURIComponent(id)+"/songs?page="+(page||0)+"&sortBy=popularity&sortOrder=desc","artist-songs:"+id+":"+(page||0),300000,signal);}
 };
 
+/* ============================================================ SOURCE HUB ============================================================
+   Source plugins (JioSaavn, YouTube Music, ...) plug in here.
+   Plugin ON  = its songs show up (search, home, playback).   Plugin OFF = they disappear.
+   The on/off switch lives in the Plugins page (saved as bosPlugins_enabled in this browser). */
+const SourceHub=(function(){
+  var CORE="jiosaavn",SELKEY="bosSrcOff",list={},order=[],tm=null;
+  list[CORE]={id:CORE,name:"JioSaavn",core:true};order.push(CORE);
+  function flags(){try{return JSON.parse(localStorage.getItem("bosPlugins_enabled")||"{}")||{};}catch(e){return {};}}
+  function isOn(id){var m=flags();if(id in m)return !!m[id];return id===CORE;}
+  function changed(){clearTimeout(tm);tm=setTimeout(function(){if(hub.onChange){try{hub.onChange();}catch(e){console.warn(e);}}},60);}
+  function register(src){
+    list[src.id]=src;if(order.indexOf(src.id)<0)order.push(src.id);changed();
+    return function(){if(src.core)return;if(list[src.id]===src){delete list[src.id];order=order.filter(function(x){return x!==src.id;});}changed();};
+  }
+  function enabledIds(){return order.filter(function(id){return list[id]&&isOn(id);});}
+  function deselected(){try{return JSON.parse(localStorage.getItem(SELKEY)||"[]")||[];}catch(e){return [];}}
+  function isSel(id){return deselected().indexOf(id)<0;}
+  function toggleSel(id){var d=deselected(),i=d.indexOf(id);if(i<0)d.push(id);else d.splice(i,1);try{localStorage.setItem(SELKEY,JSON.stringify(d));}catch(e){}}
+  function selected(){return enabledIds().filter(isSel);}
+  function trackSource(t){return (t&&t.source)||CORE;}
+  function trackAllowed(t){return isOn(trackSource(t));}
+  function interleave(a,b){var o=[],n=Math.max(a.length,b.length);for(var i=0;i<n;i++){if(i<a.length)o.push(a[i]);if(i<b.length)o.push(b[i]);}return o;}
+  function withTimeout(p,ms){return new Promise(function(res,rej){var t=setTimeout(function(){rej(new Error("timeout"));},ms);p.then(function(v){clearTimeout(t);res(v);},function(e){clearTimeout(t);rej(e);});});}
+  /* search the given NON-core sources; one slow/broken source never blocks the others */
+  async function search(q,ids,opts){
+    var lists=await Promise.all(ids.map(async function(id){
+      var s=list[id];if(!s||!s.search||!isOn(id))return [];
+      try{
+        var r=await withTimeout(Promise.resolve(s.search(q,opts||{})),4500);
+        return (r||[]).filter(Boolean).map(function(t){
+          var raw=String(t.id);
+          return {id:raw.indexOf(id+":")===0?raw:id+":"+raw,name:t.name||"Untitled",duration:Number(t.duration)||0,year:"",language:"",
+            image:t.image||FALLBACK_ART,artistName:t.artistName||"Unknown Artist",artistId:null,albumName:t.albumName||"",albumId:null,
+            downloadUrl:{},hasLyrics:false,_needsFetch:true,source:id,_vid:t._vid||null};
+        });
+      }catch(e){if(!(e&&e.name==="AbortError"))console.warn("[source "+id+"] search failed:",e&&e.message||e);return [];}
+    }));
+    var out=[];lists.forEach(function(l){out=interleave(out,l);});return out;
+  }
+  /* make sure a (non-core) track has a fresh playable URL; YouTube links expire, so they are re-resolved */
+  async function resolveTrack(t){
+    var id=trackSource(t);if(id===CORE)return t;
+    var s=list[id];if(!s||!s.resolve)throw new Error("source '"+id+"' is not ready");
+    var fresh=t._resolvedAt&&(Date.now()-t._resolvedAt)<(s.ttl||5400000)&&Object.keys(t.downloadUrl||{}).length;
+    if(fresh)return t;
+    var r=await s.resolve(t),url=typeof r==="string"?r:(r&&r.url);
+    if(!url)throw new Error("no audio found");
+    var dl={"160":url};if(r&&r.alt)dl["96"]=r.alt;
+    t.downloadUrl=dl;t._needsFetch=false;t._resolvedAt=Date.now();return t;
+  }
+  function ready(id,ms){return new Promise(function(res){var t0=Date.now();(function chk(){if(list[id]||Date.now()-t0>ms)return res(!!list[id]);setTimeout(chk,150);})();});}
+  var hub={list:list,CORE:CORE,isOn:isOn,register:register,changed:changed,enabledIds:enabledIds,isSel:isSel,toggleSel:toggleSel,selected:selected,
+    trackSource:trackSource,trackAllowed:trackAllowed,interleave:interleave,search:search,resolveTrack:resolveTrack,ready:ready,onChange:null};
+  return hub;
+})();
+/* JioSaavn OFF => every JioSaavn request is refused, so its songs/albums/artists/playlists vanish everywhere */
+Object.keys(Api).forEach(function(k){var f=Api[k];Api[k]=function(){
+  if(!SourceHub.isOn("jiosaavn"))return Promise.reject({type:"source-off",message:"JioSaavn plugin is off. Turn it on in Plugins to get its songs.",source:"jiosaavn"});
+  return f.apply(this,arguments);};});
+(function(){var st=document.createElement("style");st.id="bos-source-css";st.textContent=
+".src-panel{margin:4px 0 14px;padding:12px 14px;border-radius:var(--r-lg)}"
++".src-title{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--text-3);margin-bottom:8px}"
++".src-chips{display:flex;gap:8px;flex-wrap:wrap}"
++".src-chip{border:1px solid var(--glass-2-brd);background:rgba(255,255,255,.05);color:var(--text-2);border-radius:99px;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}"
++".src-chip.on{background:var(--accent-soft);color:var(--text-1);border-color:var(--accent)}"
++".src-empty{font-size:12.5px;color:var(--text-2)}";document.head.appendChild(st);})();
+function renderSourceChips(){
+  const el=$("#search-sources");if(!el)return;
+  const ids=SourceHub.enabledIds();
+  if(!ids.length){el.innerHTML='<div class="src-panel glass-2"><div class="src-title">SOURCES</div><div class="src-empty">No source plugin is on. Tap the puzzle icon (top right) and switch one on.</div></div>';return;}
+  el.innerHTML='<div class="src-panel glass-2"><div class="src-title">SOURCES</div><div class="src-chips">'+ids.map(function(id){const on=SourceHub.isSel(id);return '<button class="src-chip'+(on?' on':'')+'" data-src="'+esc(id)+'">'+(on?'\u2713 ':'')+esc(SourceHub.list[id].name||id)+'</button>';}).join("")+'</div></div>';
+  el.querySelectorAll("[data-src]").forEach(function(b){b.addEventListener("click",function(){SourceHub.toggleSel(b.dataset.src);renderSourceChips();if(State.searchQuery)runSearch();});});
+}
+/* a source plugin was switched on/off (or finished loading): refresh what is on screen */
+SourceHub.onChange=function(){
+  try{
+    State._homeLoadedAt=0;
+    const t=State.currentTrack;
+    if(t&&State.isPlaying&&!SourceHub.isOn(SourceHub.trackSource(t))){Player.pause();toast("Plugin '"+SourceHub.trackSource(t)+"' is off, so its song was paused.");}
+    if(State.view==="search"){renderSourceChips();if(State.searchQuery)runSearch();}
+    else if(State.view==="home"&&!State._homeLoading){renderHome();}
+  }catch(e){console.warn(e);}
+};
+
 /* ---------------- NORMALIZERS ---------------- */
 function bestImage(imgArr){
   if(!imgArr || !imgArr.length) return FALLBACK_ART;
@@ -2600,6 +2684,7 @@ window.addEventListener("popstate",e=>{
 /* ============================================================ RENDER: HOME ============================================================ */
 async function renderHome(){
   if(State._homeLoading)return;
+  if(!SourceHub.isOn("jiosaavn")){$("#view-home").innerHTML=emptyStateHTML(svgMusicEmpty(),"JioSaavn is off","Home songs come from the JioSaavn plugin. Switch it on (puzzle icon, top right) and they appear; switch it off and they disappear. Use Search to find songs from your other sources.");State._homeLoadedAt=0;return;}
   if($("#view-home").querySelector(".section")&&Date.now()-State._homeLoadedAt<120000)return;
   if(State._homeAbort)try{State._homeAbort.abort();}catch(_){}
   const ctl=new AbortController();State._homeAbort=ctl;State._homeLoading=true;const seq=++State._navSeq;State._homeSeenFamilies=new Set();
@@ -2641,7 +2726,8 @@ function renderSearchView(){
     +'<input type="text" id="search-input" placeholder="Search songs, artists, albums, playlists…" value="'+esc(State.searchQuery)+'" autocomplete="off">'
     +'<button class="icon-btn" id="search-clear" style="'+(State.searchQuery?"":"display:none")+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>'
     +'<div class="search-tabs" id="search-tabs">'+["all","songs","albums","artists","playlists"].map(tb=>'<button class="stab'+(State.searchTab===tb?" active":"")+'" data-tab="'+tb+'">'+tb[0].toUpperCase()+tb.slice(1)+'</button>').join("")+'</div>'
-    +'<div id="search-results"></div>';
+    +'<div id="search-sources"></div><div id="search-results"></div>';
+  renderSourceChips();
   const input = $("#search-input");
   /* V22: auto-open the keyboard only on desktop and only for an empty search; on phones the user taps the bar */
   if(!State.searchQuery && window.matchMedia && matchMedia("(hover:hover) and (pointer:fine)").matches){ try{ input.focus({preventScroll:true}); }catch(_){} }
@@ -2672,12 +2758,20 @@ async function runSearch(){
   const ctl=new AbortController();State._searchAbort=ctl;const seq=++State._searchSeq;res.innerHTML='<div class="row-list">'+skeletonRows(6)+'</div>';
   try{
     if(State.searchTab==="all"){
-      const r=await Api.searchAll(q,ctl.signal);if(ctl.signal.aborted||seq!==State._searchSeq)return;const d=r.data||{},songs=(d.songs&&d.songs.results||[]).map(normalizeSongFromCompact),albums=(d.albums&&d.albums.results||[]).map(normalizeAlbumFromCompact),artists=(d.artists&&d.artists.results||[]).map(normalizeArtistFromCompact);let html="";
+      const sel=SourceHub.selected(),coreSel=sel.indexOf("jiosaavn")>=0&&SourceHub.isOn("jiosaavn");if(!sel.length){res.innerHTML=emptyStateHTML(svgMusicEmpty(),"No source selected","Switch on a source plugin (puzzle icon) and pick it under Sources.");return;}
+      const [rc,extra]=await Promise.all([coreSel?Api.searchAll(q,ctl.signal).catch(function(e){return {__err:e};}):Promise.resolve(null),SourceHub.search(q,sel.filter(function(x){return x!=="jiosaavn";}),{signal:ctl.signal,limit:20})]);
+      if(ctl.signal.aborted||seq!==State._searchSeq)return;
+      if(rc&&rc.__err){if(rc.__err.type==="aborted")return;if(!extra.length)throw rc.__err;}
+      const d=(rc&&!rc.__err&&rc.data)||{},songs=SourceHub.interleave((d.songs&&d.songs.results||[]).map(normalizeSongFromCompact),extra),albums=(d.albums&&d.albums.results||[]).map(normalizeAlbumFromCompact),artists=(d.artists&&d.artists.results||[]).map(normalizeArtistFromCompact);let html="";
       if(songs.length){storeCtx("search-all",songs);html+='<div class="section-title" style="margin:6px 0 10px;">Songs</div><div class="row-list">'+songs.map((s,i)=>songRow(s,i,{ctxKey:"search-all"})).join("")+'</div>';}
       if(albums.length)html+='<div class="section-title" style="margin:20px 0 10px;">Albums</div><div class="hscroll">'+albums.map(albumCard).join("")+'</div>';
       if(artists.length)html+='<div class="section-title" style="margin:20px 0 10px;">Artists</div><div class="hscroll">'+artists.map(artistCard).join("")+'</div>';
       if(!songs.length&&!albums.length&&!artists.length)return renderNoResults(res);res.innerHTML=html;
-    }else if(State.searchTab==="songs"){const r=await Api.searchSongs(q,0,30,ctl.signal);if(ctl.signal.aborted||seq!==State._searchSeq)return;const list=(r.data.results||[]).map(normalizeSong);if(!list.length)return renderNoResults(res);storeCtx("search-songs",list);res.innerHTML='<div class="row-list">'+list.map((s,i)=>songRow(s,i,{ctxKey:"search-songs"})).join("")+'</div>';
+    }else if(State.searchTab==="songs"){const sel=SourceHub.selected(),coreSel=sel.indexOf("jiosaavn")>=0&&SourceHub.isOn("jiosaavn");if(!sel.length){res.innerHTML=emptyStateHTML(svgMusicEmpty(),"No source selected","Switch on a source plugin (puzzle icon) and pick it under Sources.");return;}
+      const [rc,extra]=await Promise.all([coreSel?Api.searchSongs(q,0,30,ctl.signal).catch(function(e){return {__err:e};}):Promise.resolve(null),SourceHub.search(q,sel.filter(function(x){return x!=="jiosaavn";}),{signal:ctl.signal,limit:30})]);
+      if(ctl.signal.aborted||seq!==State._searchSeq)return;
+      if(rc&&rc.__err){if(rc.__err.type==="aborted")return;if(!extra.length)throw rc.__err;}
+      const list=SourceHub.interleave(((rc&&!rc.__err&&rc.data&&rc.data.results)||[]).map(normalizeSong),extra);if(!list.length)return renderNoResults(res);storeCtx("search-songs",list);res.innerHTML='<div class="row-list">'+list.map((s,i)=>songRow(s,i,{ctxKey:"search-songs"})).join("")+'</div>';
     }else if(State.searchTab==="albums"){const r=await Api.searchAlbums(q,0,24,ctl.signal);if(ctl.signal.aborted||seq!==State._searchSeq)return;const list=(r.data.results||[]).map(normalizeAlbum);if(!list.length)return renderNoResults(res);res.innerHTML='<div class="grid">'+list.map(albumCard).join("")+'</div>';
     }else if(State.searchTab==="artists"){const r=await Api.searchArtists(q,0,24,ctl.signal);if(ctl.signal.aborted||seq!==State._searchSeq)return;const list=(r.data.results||[]).map(normalizeArtist);if(!list.length)return renderNoResults(res);res.innerHTML='<div class="grid">'+list.map(artistCard).join("")+'</div>';
     }else if(State.searchTab==="playlists"){const r=await Api.searchPlaylists(q,0,24,ctl.signal);if(ctl.signal.aborted||seq!==State._searchSeq)return;const list=(r.data.results||[]).map(normalizePlaylist);if(!list.length)return renderNoResults(res);res.innerHTML='<div class="grid">'+list.map(playlistCard).join("")+'</div>';}
@@ -2862,6 +2956,8 @@ function findTrackById(id){
   return null;
 }
 async function resolvePlayableTrack(track){
+  if(track&&!SourceHub.trackAllowed(track)){toast("The '"+SourceHub.trackSource(track)+"' plugin is off. Turn it on in Plugins to play this song.","error");return null;}
+  if(track&&SourceHub.trackSource(track)!=="jiosaavn")return track;   /* other sources are resolved inside Player.play */
   if(track && track._needsFetch && !Object.keys(track.downloadUrl||{}).length){
     try{ const r = await Api.getSong(track.id); const full = normalizeSong(Array.isArray(r.data)?r.data[0]:r.data); return full; }
     catch(e){ toast("Couldn't load this track's audio.", "error"); return null; }
@@ -5395,6 +5491,21 @@ setInterval(function(){if(State.view==='charts'&&CH.list&&!CH.busy&&Date.now()-C
   function on(n,f){(bus[n]=bus[n]||[]).push(f);return function(){off(n,f);};}
   function off(n,f){bus[n]=(bus[n]||[]).filter(function(x){return x!==f;});}
   function emit(n,d){(bus[n]||[]).slice().forEach(function(f){try{f(d);}catch(e){console.error("[BOS plugin event:"+n+"]",e);}});}
+  /* source plugins: block songs of a plugin that is off, and fetch a fresh audio URL for YouTube-type sources */
+  var _srcPlay=Player.play,_srcTok=0;
+  Player.play=async function(track,ctx,idx,opts){
+    if(track&&track.id!=null){
+      var sid=SourceHub.trackSource(track);
+      if(!SourceHub.isOn(sid)){if(!(opts&&opts.autoTransition))toast("Plugin '"+sid+"' is off. Turn it on to play this song.","error");return false;}
+      var tok=++_srcTok;
+      if(sid!=="jiosaavn"){
+        try{await SourceHub.ready(sid,4000);await SourceHub.resolveTrack(track);}
+        catch(e){if(tok===_srcTok)toast("Couldn't load audio from "+sid+": "+(e&&e.message||e),"error");return false;}
+        if(tok!==_srcTok)return false;
+      }
+    }
+    return _srcPlay.call(this,track,ctx,idx,opts);
+  };
   var lastId=null,_play=Player.play,lastProg=0;
   Player.play=function(){
     var p=_play.apply(this,arguments),t=State.currentTrack;
@@ -5412,7 +5523,7 @@ setInterval(function(){if(State.view==='charts'&&CH.list&&!CH.busy&&Date.now()-C
   });
   window.__BOS_BRIDGE={
     version:1,on:on,off:off,emit:emit,
-    State:State,Player:Player,Queue:Queue,Store:Store,History:History,Api:Api,
+    State:State,Player:Player,Queue:Queue,Store:Store,History:History,Api:Api,SourceHub:SourceHub,
     toast:toast,NAV_TITLES:NAV_TITLES,audios:audios,primaryAudio:primaryAudio,
     navigate:function(){return navigate.apply(null,arguments);},
     $:$,$$:$$,esc:esc,fmtTime:fmtTime

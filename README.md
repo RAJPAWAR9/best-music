@@ -11,6 +11,9 @@ plugins/
   tab-title.js      example extension (events)
   play-stats.js     example extension (custom sidebar page)
   neon-theme.css    example theme (just CSS variables)
+  jiosaavn.js       source plugin: JioSaavn (built in)
+  ytmusic.js        source plugin: YouTube Music (audio)
+  ytvideo.js        source plugin: YouTube Video (audio)
 ```
 Deploy: push this folder to GitHub, Settings → Pages → branch `main`. Nothing else needed.
 
@@ -54,6 +57,29 @@ Everything created through `api` (buttons, pages, CSS, timers, listeners) is rem
 ## Themes
 A theme is a `.css` file registered with `type:"theme"`. Useful variables: `--accent-r/g/b`, `--bg-0/1/2`, `--text-1/2/3`, `--r-sm…--r-xl`.
 
+## Source plugins (songs / audio)
+A **source** plugin brings songs into the app. Switch it **ON** and its songs show up; switch it **OFF** and they disappear.
+- **Plugins page**: puzzle icon (top right) -> switch next to *JioSaavn*, *YouTube Music*, *YouTube Video*.
+- **Search page**: a *Sources* card shows the sources that are ON. Tap a chip to include/exclude that source in the results.
+- **JioSaavn OFF**: Home, Search, albums, artists, playlists and playback of JioSaavn songs all stop (the app refuses every JioSaavn request).
+- **YouTube OFF**: its songs vanish from Search and its songs will not play. A playing song of a plugin you switch off is paused.
+- YouTube plugins use a public **Piped** server. Servers come and go, so if YouTube search returns nothing, open *Plugins -> YouTube Music -> Settings* and paste a working Piped API URL.
+
+Write your own source:
+```js
+BOS.register({
+  id: "mysource", name: "My Source", version: "1.0.0",
+  init(api) {
+    api.sources.register({
+      name: "My Source",
+      async search(q, { signal, limit }) { return [{ id:"123", name:"Song", artistName:"Artist", image:"https://...", duration:200 }]; },
+      async resolve(track) { return "https://.../audio.m4a"; }   // or { url, alt }
+    });
+  }
+});
+```
+Add `{ id:"mysource", name:"My Source", type:"source", entry:"plugins/mysource.js", description:"...", enabled:true }` to `plugins/registry.js`.
+
 ## Not included yet (next steps)
-- Source plugins (extra search/audio providers) — needs the search/stream code routed through a provider list.
+- Albums / artists / playlists from non-JioSaavn sources (only songs for now).
 - Lyrics-provider plugins.
